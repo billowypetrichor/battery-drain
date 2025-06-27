@@ -1,0 +1,155 @@
+name: Build and Push to ACR
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+  packages: write
+  actions: read
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    - name: Login to Azure
+      uses: azure/login@v1
+      with:
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
+      
+    - name: Get secrets from Azure Key Vault
+      id: get-secrets
+      uses: azure/get-keyvault-secrets@v1
+      with:
+        keyvault: ${{ secrets.KEYVAULT_NAME }}
+        secrets: |
+          CUSTOM_SECCOMP_PROFILE
+          DCT_REPO_PASSPHRASE
+          DCT_ROOT_PASSPHRASE
+          ARGOCD_SERVER
+          ARGOCD_USERNAME
+          ARGOCD_PASSWORD
+          KUBECONFIG
+
+    - name: Install Docker in Rootless Mode
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y docker.io
+        sudo systemctl disable --now docker
+        sudo loginctl enable-linger $USER
+        dockerd-rootless-setuptool.sh install
+
+    - name: Setup Docker Rootless Context
+      run: |
+        docker context create rootless
+        docker context use rootless
+
+    - name: Setup .NET Core
+      uses: actions/setup-dotnet@v3
+      with:
+        dotnet-version: '5.0.x'
+
+    - name: Restore NuGet packages
+      run: dotnet restore
+      working-directory: ./packages/app
+
+    - name: Build the application
+      run: dotnet build --configuration Release --no-restore
+      working-directory: ./packages/app
+
+    - name: Publish the application
+      run: dotnet publish -c Release -o publish
+      working-directory: ./packages/app
+
+    - name: Build Docker image
+      run: docker build -t ${{ secrets.ACR_LOGIN_SERVER }}/dotnet-hello-world:${{ github.sha }} .
+      working-directory: ./packages/app
+
+    - name: Copy Custom Seccomp Profile
+      run: echo '${{ steps.get-secrets.outputs.CUSTOM_SECCOMP_PROFILE }}' > custom-seccomp.json
+      working-directory: ./packages/app
+
+    - name: Test Docker image with Custom Seccomp Profile
+      run: docker run --rm --security-opt seccomp=custom-seccomp.json ${{ secrets.ACR_LOGIN_SERVER }}/dotnet-hello-world:${{ github.sha }}
+      working-directory: ./packages/app
+
+    - name: Scan Docker image for vulnerabilities
+      uses: aquasecurity/trivy-action@0.28.0
+      with:
+        image-ref: ${{ secrets.ACR_LOGIN_SERVER }}/dotnet-hello-world:${{ github.sha }}
+        format: 'table'
+        exit-code: '1'
+        ignore-unfixed: true
+        vuln-type: 'os,library'
+        severity: 'CRITICAL,HIGH'
+
+    - name: Scan Terraform files for vulnerabilities
+      uses: aquasecurity/trivy-action@0.28.0
+      with:
+        scan-type: 'config'
+        input: './infra'
+        tf-vars: './infra/variables.tfvars'
+        format: 'table'
+        exit-code: '1'
+        severity: 'CRITICAL,HIGH'
+
+    - name: Login to Azure Container Registry
+      uses: azure/docker-login@v1
+      with:
+        login-server: ${{ secrets.ACR_LOGIN_SERVER }}
+        username: ${{ secrets.ACR_USERNAME }}
+        password: ${{ secrets.ACR_PASSWORD }}
+
+    - name: Push Docker image to ACR
+      run: docker push ${{ secrets.ACR_LOGIN_SERVER }}/dotnet-hello-world:${{ github.sha }}
+
+    - name: Sign Docker image
+      run: |
+        export DOCKER_CONTENT_TRUST=1
+        docker trust sign ${{ secrets.ACR_LOGIN_SERVER }}/dotnet-hello-world:${{ github.sha }}
+      env:
+        DCT_REPO_PASSPHRASE: ${{ steps.get-secrets.outputs.DCT_REPO_PASSPHRASE }}
+        DCT_ROOT_PASSPHRASE: ${{ steps.get-secrets.outputs.DCT_ROOT_PASSPHRASE }}
+
+    - name: Update Helm Chart
+      run: |
+        sed -i 's/tag:.*/tag: ${{ github.sha }}/' helm-chart/microservice/values.yaml
+        git config --global user.email "you@example.com"
+        git config --global user.name "Your Name"
+        git add helm-chart/microservice/values.yaml
+        git commit -m "Update Helm chart with new image tag"
+        git push origin main
+
+    - name: Install ArgoCD CLI
+      run: |
+        curl -sSL -o argocd-linux-amd64 https://github.com/argoproj/argo-cd/releases/latest/download/argocd-linux-amd64
+        sudo install -m 555 argocd-linux-amd64 /usr/local/bin/argocd
+        rm argocd-linux-amd64
+
+    - name: Write Kubeconfig to File
+      run: echo '${{ steps.get-secrets.outputs.KUBECONFIG }}' > kubeconfig
+      working-directory: ./packages/app
+
+    - name: Apply ArgoCD Application Manifest
+      run: kubectl apply -f packages/k8s/application.yaml
+      env:
+        KUBECONFIG: ./packages/app/kubeconfig
+
+    - name: Apply Kubernetes Deployment
+      run: kubectl apply -f packages/k8s/deployment.yaml
+      env:
+        KUBECONFIG: ./packages/app/kubeconfig
+
+    - name: Sync ArgoCD Application
+      run: |
+        argocd app sync microservice
+      env:
+        ARGOCD_SERVER: ${{ steps.get-secrets.outputs.ARGOCD_SERVER }}
+        ARGOCD_USERNAME: ${{ steps.get-secrets.outputs.ARGOCD_USERNAME }}
+        ARGOCD_PASSWORD: ${{ steps.get-secrets.outputs.ARGOCD_PASSWORD }}

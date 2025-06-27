@@ -1,0 +1,89 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dotnet-hello-world
+  labels:
+    app: dotnet-hello-world
+spec:
+  replicas: 3  # Number of replicas to ensure high availability
+  selector:
+    matchLabels:
+      app: dotnet-hello-world
+  template:
+    metadata:
+      labels:
+        app: dotnet-hello-world
+    spec:
+      containers:
+      - name: dotnet-hello-world
+        image: your-docker-repo/dotnet-hello-world:latest # Replace with your Docker image name
+        ports:
+        - containerPort: 5000
+        resources:
+          requests:
+            cpu: "200m"
+            memory: "512Mi"
+          limits:
+            cpu: "500m"
+            memory: "1Gi"
+        securityContext:
+          runAsUser: 1000
+          runAsGroup: 3000
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+            add:
+            - NET_BIND_SERVICE
+          seccompProfile:
+            type: Localhost
+            localhostProfile: seccomp/custom-seccomp.json
+        volumeMounts:
+        - mountPath: /app/logs
+          name: log-volume
+          readOnly: false
+        volumes:
+        - name: log-volume
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dotnet-hello-world-service
+spec:
+  selector:
+    app: dotnet-hello-world
+  ports:
+  - protocol: TCP
+    port: 5000
+    targetPort: 5000
+  type: LoadBalancer  # Expose the service publicly
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-specific-traffic
+  namespace: default
+spec:
+  podSelector:
+    matchLabels:
+      app: dotnet-hello-world
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app: trusted-app
+    ports:
+    - protocol: TCP
+      port: 5000
+  egress:
+  - to:
+    - podSelector:
+        matchLabels:
+          app: external-service
+    ports:
+    - protocol: TCP
+      port: 80
