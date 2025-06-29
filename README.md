@@ -35,6 +35,8 @@ Please send us both folders/repositories and we will have a look over your code.
 points, send us as well a diagram that contains the resources and the connections in
 between them.
 
+!!! Click edit to view minimal diagram.
+
 +-----------------------------------------------------+
 |                     Local Environment               |
 +-----------------------------------------------------+
