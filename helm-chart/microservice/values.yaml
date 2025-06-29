@@ -1,0 +1,58 @@
+replicaCount: 3
+
+image:
+  repository: <azurerm_container_registry.main.name>/battery-drain
+  tag: latest
+  pullPolicy: IfNotPresent
+
+service:
+  type: LoadBalancer
+  port: 5000
+
+resources:
+  requests:
+    cpu: "200m"
+    memory: "512Mi"
+  limits:
+    cpu: "500m"
+    memory: "1Gi"
+
+securityContext:
+  runAsUser: 1000
+  runAsGroup: 3000
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop:
+    - ALL
+    add:
+    - NET_BIND_SERVICE
+  seccompProfile:
+    type: Localhost
+    localhostProfile: seccomp/custom-seccomp.json
+
+volumeMounts:
+  - mountPath: /app/logs
+    name: log-volume
+    readOnly: false
+
+volumes:
+  - name: log-volume
+    emptyDir: {}
+
+networkPolicy:
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: trusted-app
+      ports:
+        - protocol: TCP
+          port: 5000
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: external-service
+      ports:
+        - protocol: TCP
+          port: 80

@@ -15,11 +15,11 @@ WORKDIR /app
 
 COPY --from=build /app ./
 
-RUN addgroup --system appgroup && adduser --system --ingroup appgroup appuser && \
-    chown -R appuser:appgroup /app && \
+RUN addgroup --system draingroup && adduser --system --ingroup draingroup drainuser && \
+    chown -R drainuser:draingroup /app && \
     setcap 'cap_net_bind_service=+ep' /usr/bin/dotnet
 
-USER appuser
+USER drainuser
 
 VOLUME /app/logs
 

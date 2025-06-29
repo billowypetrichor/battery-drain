@@ -6,9 +6,9 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: 'https://github.com/<your-repo>/helm-chart'
+    repoURL: 'https://github.com/billowypetrichor/battery-drain'
     targetRevision: HEAD
-    path: microservice
+    path: helm-chart/microservice
   destination:
     server: 'https://kubernetes.default.svc'
     namespace: default
