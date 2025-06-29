@@ -25,7 +25,7 @@ should include the following steps:
     ● Push the Docker image to the ACR.
 
 IV. Create a Kubernetes manifest file to deploy your .NET web application. Make sure
-you expose it publicly and you ensure high availability () for your application.
+you expose it publicly and you ensure high availability for your application.
 
 V. Setup a microservice deployment to the AKS cluster using ArgoCD and Helm
 manifest files given that you have in place a Docker image of that microservice
@@ -34,3 +34,87 @@ hosted in a container registry.
 Please send us both folders/repositories and we will have a look over your code. For bonus
 points, send us as well a diagram that contains the resources and the connections in
 between them.
+
++-----------------------------------------------------+
+|                     Local Environment               |
++-----------------------------------------------------+
+|                                                     |
+|  +----------------------+                           |
+|  |                      |                           |
+|  |   Terraform          |                           |
+|  |  (Creates Azure      |                           |
+|  |   Resources)         |                           |
+|  |                      |                           |
+|  +----------+-----------+                           |
+|             |                                       |
+|             |                                       |
+|             V                                       |
+|                                                     |
+|  +-----------------------------------------+        |
+|  |                                         |        |
+|  |              Azure Resources            |        |
+|  |                                         |        |
+|  |  +-------------------------+            |        |
+|  |  |                         |            |        |
+|  |  |    Resource Group       |            |        |
+|  |  |        (main)           |            |        |
+|  |  |                         |            |        |
+|  |  +-----------+-------------+            |        |
+|  |              |                          |        |
+|  |              V                          |        |
+|  |  +-----------+-------------+            |        |
+|  |  |                         |            |        |
+|  |  |     AKS Cluster         |            |        |
+|  |  |        (main)           |            |        |
+|  |  |                         |            |        |
+|  |  +-----------+-------------+            |        |
+|  |              |                          |        |
+|  |              V                          |        |
+|  |  +-----------+-------------+            |        |
+|  |  |                         |            |        |
+|  |  |     Azure Container     |            |        |
+|  |  |       Registry (ACR)    |            |        |
+|  |  |                         |            |        |
+|  |  +-----------+-------------+            |        |
+|  |              |                          |        |
+|  |              V                          |        |
+|  |  +-----------+-------------+            |        |
+|  |  |                         |            |        |
+|  |  |     Azure Key Vault     |            |        |
+|  |  |       (main)            |            |        |
+|  |  |                         |            |        |
+|  |  +-----------+-------------+            |        |
+|  |              |                          |        |
+|  |              V                          |        |
+|  |  +-----------+-------------+            |        |
+|  |  |                         |            |        |
+|  |  |     Cosmos DB           |            |        |
+|  |  |                         |            |        |
+|  |  +-------------------------+            |        |
+|  |                                         |        |
+|  +-----------------------------------------+        |
+|                                                     |
++-----------------------------------------------------+
+|                                                     |
+|  +----------------------+                           |
+|  |                      |                           |
+|  |  Kubernetes & Helm   |                           |
+|  | (Configures AKS)     |                           |
+|  |                      |                           |
+|  +----------------------+                           |
+|                                                     |
++-----------------------------------------------------+
+|                                                     |
+|  +----------------------+                           |
+|  |                      |                           |
+|  |     GitHub Actions   |                           |
+|  |  (Builds & Pushes    |                           |
+|  |   Docker Image to    |                           |
+|  |   ACR using secrets  |                           |
+|  |   from Key Vault)    |                           |
+|  |                      |                           |
+|  +----------------------+                           |
+|                                                     |
++-----------------------------------------------------+
+
+P.S. "V" is experimental, iffy at best.

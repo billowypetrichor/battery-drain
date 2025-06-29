@@ -32,10 +32,6 @@ jobs:
           CUSTOM_SECCOMP_PROFILE
           DCT_REPO_PASSPHRASE
           DCT_ROOT_PASSPHRASE
-          ARGOCD_SERVER
-          ARGOCD_USERNAME
-          ARGOCD_PASSWORD
-          KUBECONFIG
 
     - name: Install Docker in Rootless Mode
       run: |
@@ -51,9 +47,9 @@ jobs:
         docker context use rootless
 
     - name: Setup .NET Core
-      uses: actions/setup-dotnet@v3
+      uses: actions/setup-dotnet@v4
       with:
-        dotnet-version: '5.0.x'
+        dotnet-version: '8.0.x'
 
     - name: Restore NuGet packages
       run: dotnet restore
@@ -116,40 +112,3 @@ jobs:
       env:
         DCT_REPO_PASSPHRASE: ${{ steps.get-secrets.outputs.DCT_REPO_PASSPHRASE }}
         DCT_ROOT_PASSPHRASE: ${{ steps.get-secrets.outputs.DCT_ROOT_PASSPHRASE }}
-
-    - name: Update Helm Chart
-      run: |
-        sed -i 's/tag:.*/tag: ${{ github.sha }}/' helm-chart/microservice/values.yaml
-        git config --global user.email "you@example.com"
-        git config --global user.name "Your Name"
-        git add helm-chart/microservice/values.yaml
-        git commit -m "Update Helm chart with new image tag"
-        git push origin main
-
-    - name: Install ArgoCD CLI
-      run: |
-        curl -sSL -o argocd-linux-amd64 https://github.com/argoproj/argo-cd/releases/latest/download/argocd-linux-amd64
-        sudo install -m 555 argocd-linux-amd64 /usr/local/bin/argocd
-        rm argocd-linux-amd64
-
-    - name: Write Kubeconfig to File
-      run: echo '${{ steps.get-secrets.outputs.KUBECONFIG }}' > kubeconfig
-      working-directory: ./packages/app
-
-    - name: Apply ArgoCD Application Manifest
-      run: kubectl apply -f packages/k8s/application.yaml
-      env:
-        KUBECONFIG: ./packages/app/kubeconfig
-
-    - name: Apply Kubernetes Deployment
-      run: kubectl apply -f packages/k8s/deployment.yaml
-      env:
-        KUBECONFIG: ./packages/app/kubeconfig
-
-    - name: Sync ArgoCD Application
-      run: |
-        argocd app sync microservice
-      env:
-        ARGOCD_SERVER: ${{ steps.get-secrets.outputs.ARGOCD_SERVER }}
-        ARGOCD_USERNAME: ${{ steps.get-secrets.outputs.ARGOCD_USERNAME }}
-        ARGOCD_PASSWORD: ${{ steps.get-secrets.outputs.ARGOCD_PASSWORD }}

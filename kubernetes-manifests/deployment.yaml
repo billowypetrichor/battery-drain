@@ -1,22 +1,22 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: dotnet-hello-world
+  name: battery-drain
   labels:
-    app: dotnet-hello-world
+    app: battery-drain
 spec:
-  replicas: 3  # Number of replicas to ensure high availability
+  replicas: 3
   selector:
     matchLabels:
-      app: dotnet-hello-world
+      app: battery-drain
   template:
     metadata:
       labels:
-        app: dotnet-hello-world
+        app: battery-drain
     spec:
       containers:
-      - name: dotnet-hello-world
-        image: your-docker-repo/dotnet-hello-world:latest # Replace with your Docker image name
+      - name: battery-drain
+        image: <azurerm_container_registry.main.name>/battery-drain:hash
         ports:
         - containerPort: 5000
         resources:
@@ -49,15 +49,15 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: dotnet-hello-world-service
+  name: battery-drain-service
 spec:
   selector:
-    app: dotnet-hello-world
+    app: battery-drain
   ports:
   - protocol: TCP
     port: 5000
     targetPort: 5000
-  type: LoadBalancer  # Expose the service publicly
+  type: LoadBalancer
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -67,7 +67,7 @@ metadata:
 spec:
   podSelector:
     matchLabels:
-      app: dotnet-hello-world
+      app: battery-drain
   policyTypes:
   - Ingress
   - Egress

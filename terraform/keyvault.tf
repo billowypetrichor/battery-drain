@@ -1,12 +1,3 @@
-provider "azurerm" {
-  features {}
-}
-
-resource "azurerm_resource_group" "main" {
-  name     = "myResourceGroup"
-  location = "West Europe"
-}
-
 resource "azurerm_key_vault" "main" {
   name                = var.keyvault_name
   location            = azurerm_resource_group.main.location
